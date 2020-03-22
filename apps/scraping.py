@@ -2,15 +2,19 @@
 # Import Splinter and BeautifulSoup
 from splinter import Browser
 from bs4 import BeautifulSoup
-import pandas as pd, datetime as dt
+import pandas as pd 
+from datetime import datetime as dt
 
 def scrape_all():
 # Windows users
-    executable_path = {'executable_path': 'chromedriver.exe'}
+    executable_path = {'executable_path': 'chromedriver'}
     browser = Browser('chrome', **executable_path, headless=True)
 
     # Set news title and paragraph variables
     news_title, news_paragraph = mars_news(browser)
+
+    # Challenge
+    mars_hemi = hemi_images(browser)
     
     # Run all scraping functions and store data
     data = {
@@ -19,6 +23,7 @@ def scrape_all():
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
         "last_modified": dt.datetime.now()
+        "hemi_images": mars_hemi
     }
     browser.quit()
     return data
@@ -88,7 +93,7 @@ def featured_image(browser):
     return img_url
 
 
-#### Space Facts
+#### Mars Facts
 def mars_facts():
     # Add try/except for error handling
     try:
@@ -101,7 +106,40 @@ def mars_facts():
     df.columns=['Description', 'Mars', 'Earth']
     df.set_index('Description', inplace=True)
     # Convert dataframe into HTML format, add bootstrap
-    return df.to_html()
+    fact_html = df.to_html(header=None).replace("dataframe","table table-striped")
+    return fact_html    
+
+def hemi_images(browser):
+    # Visit URL
+    url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
+    browser.visit(url)    
+
+    # Hemisphere Names
+    four_hemis = [
+    "Cerberus",
+    "Schiaparelli",
+    "Syrtis Major",
+    "Valles Marineris"
+    ]    
+
+    hemi_list = []
+
+    for hemi in four_hemis:
+        # Find hemisphere URL and click
+        browser.is_element_present_by_text(hemi, wait_time=1)
+        more_info_elem = browser.links.find_by_partial_text(hemi)
+        more_info_elem.click()
+        # Parse the resulting html with soup
+        html = browser.html
+        img_soup = BeautifulSoup(html, 'html.parser')
+        img_url_rel = img_soup.select_one('div.wide-image-wrapper \
+                                        div.downloads ul li a').get('href')
+        
+        hemi_list.append({"title": hemi, "img_url": img_url_rel})
+
+        browser.back()
+
+    return hemi_list    
 
 if __name__ == "__main__":
     # If running as script, print scraped data
